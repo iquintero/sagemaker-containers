@@ -463,6 +463,8 @@ class TrainingEnvironment(Environment):
         """
         super(TrainingEnvironment, self).__init__(session)
 
+        session = session or boto3.Session()
+
         resource_config = read_resource_config()
         current_host = resource_config['current_host']
         hosts = resource_config['hosts']
