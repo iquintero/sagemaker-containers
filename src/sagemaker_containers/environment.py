@@ -665,7 +665,7 @@ class ServingEnvironment(Environment):
     @property
     def use_nginx(self):  # type: () -> bool
         """Returns:
-            (bool): whether to use nginx as a reverse proxy"""
+            (bool): whether to use nginx as a reverse proxy. Default: True"""
         return self._use_nginx
 
     @property
