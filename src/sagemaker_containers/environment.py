@@ -255,9 +255,6 @@ class Environment(collections.Mapping):
         enable_metrics = util.strtobool(os.environ.get(ENABLE_METRICS_ENV, 'false')) == 1
         log_level = os.environ.get(LOG_LEVEL_ENV, logging.INFO)
 
-        sagemaker_region = os.environ.get(REGION_NAME_ENV, session.region_name)
-        os.environ[REGION_NAME_ENV] = sagemaker_region
-
         self._current_host = current_host
         self._num_gpu = gpu_count()
         self._num_cpu = cpu_count()
