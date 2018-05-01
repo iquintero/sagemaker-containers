@@ -12,6 +12,7 @@
 # language governing permissions and limitations under the License.
 from __future__ import absolute_import
 
+from abc import ABCMeta, abstractmethod
 import collections
 import json
 import logging
@@ -23,6 +24,7 @@ import sys
 
 import boto3
 import six
+from six import with_metaclass
 
 import sagemaker_containers as smc
 
@@ -36,7 +38,6 @@ logger = logging.getLogger(__name__)
 BASE_PATH_ENV = 'BASE_PATH'  # type: str
 CURRENT_HOST_ENV = 'CURRENT_HOST'  # type: str
 JOB_NAME_ENV = 'JOB_NAME'  # type: str
-USE_NGINX_ENV = 'SAGEMAKER_USE_NGINX'  # type: str
 
 BASE_PATH = os.environ.get(BASE_PATH_ENV, os.path.join('/opt', 'ml'))  # type: str
 
@@ -51,7 +52,7 @@ HYPERPARAMETERS_FILE = 'hyperparameters.json'  # type: str
 RESOURCE_CONFIG_FILE = 'resourceconfig.json'  # type: str
 INPUT_DATA_CONFIG_FILE = 'inputdataconfig.json'  # type: str
 
-PROGRAM_PARAM = 'sagemaker_program'  # type: str
+USER_PROGRAM_PARAM = 'sagemaker_program'  # type: str
 SUBMIT_DIR_PARAM = 'sagemaker_submit_directory'  # type: str
 ENABLE_METRICS_PARAM = 'sagemaker_enable_cloudwatch_metrics'  # type: str
 LOG_LEVEL_PARAM = 'sagemaker_container_log_level'  # type: str
@@ -59,8 +60,13 @@ JOB_NAME_PARAM = 'sagemaker_job_name'  # type: str
 DEFAULT_MODULE_NAME_PARAM = 'default_user_module_name'  # type: str
 REGION_PARAM_NAME = 'sagemaker_region'  # type: str
 
-SAGEMAKER_HYPERPARAMETERS = (PROGRAM_PARAM, SUBMIT_DIR_PARAM, ENABLE_METRICS_PARAM, REGION_PARAM_NAME,
+SAGEMAKER_HYPERPARAMETERS = (USER_PROGRAM_PARAM, SUBMIT_DIR_PARAM, ENABLE_METRICS_PARAM, REGION_PARAM_NAME,
                              LOG_LEVEL_PARAM, JOB_NAME_PARAM, DEFAULT_MODULE_NAME_PARAM)  # type: set
+
+# Serving
+MODEL_SERVER_WORKERS_ENV = 'SAGEMAKER_MODEL_SERVER_WORKERS'  # type: str
+MODEL_SERVER_TIMEOUT_ENV = 'SAGEMAKER_MODEL_SERVER_TIMEOUT'  # type: str
+USE_NGINX_ENV = 'SAGEMAKER_USE_NGINX'  # type: str
 
 
 def read_json(path):  # type: (str) -> dict
@@ -187,42 +193,12 @@ def cpu_count():  # type: () -> int
     return multiprocessing.cpu_count()
 
 
-class Environment(collections.Mapping):
-    """Provides access to aspects of the training environment relevant to training jobs, including
-    hyperparameters, system characteristics, filesystem locations, environment variables and configuration settings.
+class Environment(with_metaclass(ABCMeta, collections.Mapping)):
+    """Base Class which provides access to aspects of the environment including
+    system characteristics, filesystem locations, environment variables and configuration settings.
 
     The environment is a read-only snapshot of the container environment. It does not contain any form of state.
     It is a dictionary like object, allowing any builtin function that works with dictionary.
-
-    Example on how to print the state of the container:
-        >>> print(str(smc.Environment.create()))
-
-    Example on how a script can use training environment:
-        ```
-        >>>import sagemaker_containers as smc
-        >>>env = smc.Environment.create()
-
-        get the path of the channel 'training' from the inputdataconfig.json file
-        >>>training_dir = env.channel_input_dirs['training']
-
-        get a the hyperparameter 'training_data_file' from hyperparameters.json file
-        >>>file_name = env.hyperparameters['training_data_file']
-
-        # get the folder where the model should be saved
-        >>>model_dir = env.model_dir
-
-        >>>data = np.load(os.path.join(training_dir, training_data_file))
-
-        >>>x_train, y_train = data['features'], keras.utils.to_categorical(data['labels'])
-
-        >>>model = ResNet50(weights='imagenet')
-
-        ...
-        >>>model.fit(x_train, y_train)
-
-        save the model in the end of training
-        >>>model.save(os.path.join(model_dir, 'saved_model'))
-        ```
     """
 
     def properties(self):  # type: () -> list
@@ -250,6 +226,155 @@ class Environment(collections.Mapping):
         items = {_property: getattr(self, _property) for _property in self.properties()}
         return iter(items)
 
+    def __init__(self,
+                 current_host,  # type: str
+                 num_gpu,  # type: int
+                 num_cpu,  # type: int
+                 module_name,  # type: str
+                 module_dir,  # type: str
+                 enable_metrics,  # type: bool
+                 log_level  # type: int
+                 ):
+        """
+        Args:
+            current_host (str): The name of the current container on the container network. For example, 'algo-1'.
+
+            num_gpu (int): The number of gpus available in the current container.
+
+            num_cpu (int): The number of cpus available in the current container.
+        """
+        self._current_host = current_host
+        self._num_gpu = num_gpu
+        self._num_cpu = num_cpu
+        self._module_name = self._parse_module_name(module_name)
+        self._module_dir = module_dir
+        self._enable_metrics = enable_metrics
+        self._log_level = log_level
+
+    @property
+    def current_host(self):  # type: () -> str
+        """The name of the current container on the container network. For example, 'algo-1'.
+        Returns:
+            (str): current host.
+        """
+        return self._current_host
+
+    @property
+    def num_gpu(self):  # type: () -> int
+        """The number of gpus available in the current container.
+
+        Returns:
+            (int): number of gpus available in the current container.
+        """
+        return self._num_gpu
+
+    @property
+    def num_cpu(self):  # type: () -> int
+        """The number of cpus available in the current container.
+
+        Returns:
+            (int): number of cpus available in the current container.
+        """
+        return self._num_cpu
+
+    @property
+    def module_name(self):  # type: () -> str
+        """The name of the user provided module.
+
+        Returns:
+            (str): name of the user provided module
+        """
+        return self._module_name
+
+    @property
+    def module_dir(self):  # type: () -> str
+        """The full path location of the user provided module.
+
+        Returns:
+            (str): full path location of the user provided module.
+        """
+        return self._module_dir
+
+    @property
+    def enable_metrics(self):  # type: () -> bool
+        """Whether metrics should be executed in the environment or not.
+
+        Returns:
+            (bool): representing whether metrics should be executed or not.
+        """
+        return self._enable_metrics
+
+    @property
+    def log_level(self):  # type: () -> int
+        """Environment logging level.
+
+        Returns:
+            (int): environment logging level.
+        """
+        return self._log_level
+
+    @classmethod
+    @abstractmethod
+    def create(cls, session=None):  # type: (boto3.Session) -> Environment
+        """
+        Returns: an instance of `Environment`
+        """
+        pass
+
+    @staticmethod
+    def _parse_module_name(program_param):
+        """Given a module name or a script name, Returns the module name.
+
+        This function is used for backwards compatibility.
+
+        Args:
+            program_param (str): Module or script name.
+
+        Returns:
+            (str): Module name
+        """
+        if program_param.endswith('.py'):
+            return program_param[:-3]
+        return program_param
+
+
+class TrainingEnvironment(Environment):
+    """Provides access to aspects of the training environment relevant to training jobs, including
+       hyperparameters, system characteristics, filesystem locations, environment variables and configuration settings.
+
+       The environment is a read-only snapshot of the container environment. It does not contain any form of state.
+       It is a dictionary like object, allowing any builtin function that works with dictionary.
+
+       Example on how to print the state of the container:
+           >>> print(str(smc.environment.TrainingEnvironment.create()))
+
+       Example on how a script can use training environment:
+           ```
+           >>>import sagemaker_containers as smc
+           >>>env = smc.environment.TrainingEnvironment.create()
+
+           get the path of the channel 'training' from the inputdataconfig.json file
+           >>>training_dir = env.channel_input_dirs['training']
+
+           get a the hyperparameter 'training_data_file' from hyperparameters.json file
+           >>>file_name = env.hyperparameters['training_data_file']
+
+           # get the folder where the model should be saved
+           >>>model_dir = env.model_dir
+
+           >>>data = np.load(os.path.join(training_dir, training_data_file))
+
+           >>>x_train, y_train = data['features'], keras.utils.to_categorical(data['labels'])
+
+           >>>model = ResNet50(weights='imagenet')
+
+           ...
+           >>>model.fit(x_train, y_train)
+
+           save the model in the end of training
+           >>>model.save(os.path.join(model_dir, 'saved_model'))
+           ```
+       """
     def __init__(self,
                  input_dir,  # type: str
                  input_config_dir,  # type: str
@@ -361,6 +486,10 @@ class Environment(collections.Mapping):
 
             num_cpu (int): The number of cpus available in the current container.
         """
+        super(TrainingEnvironment, self).__init__(current_host, num_gpu, num_cpu, module_name, module_dir,
+                                                  enable_metrics, log_level)
+
+        self._hosts = hosts
         self._input_dir = input_dir
         self._input_config_dir = input_config_dir
         self._model_dir = model_dir
@@ -369,15 +498,17 @@ class Environment(collections.Mapping):
         self._resource_config = resource_config
         self._input_data_config = input_data_config
         self._output_data_dir = output_data_dir
-        self._hosts = hosts
         self._channel_input_dirs = channel_input_dirs
         self._current_host = current_host
-        self._num_gpu = num_gpu
-        self._num_cpu = num_cpu
-        self._module_name = self._parse_module_name(module_name)
-        self._module_dir = module_dir
-        self._enable_metrics = enable_metrics
-        self._log_level = log_level
+
+    @property
+    def hosts(self):  # type: () -> list
+        """The list of names of all containers on the container network, sorted lexicographically.
+                For example, `["algo-1", "algo-2", "algo-3"]` for a three-node cluster.
+        Returns:
+              list[str]: all the hosts in the training network.
+        """
+        return self._hosts
 
     @property
     def input_dir(self):  # type: () -> str
@@ -488,15 +619,6 @@ class Environment(collections.Mapping):
         return self._output_data_dir
 
     @property
-    def hosts(self):  # type: () -> list
-        """The list of names of all containers on the container network, sorted lexicographically.
-                For example, `["algo-1", "algo-2", "algo-3"]` for a three-node cluster.
-        Returns:
-              list[str]: all the hosts in the training network.
-        """
-        return self._hosts
-
-    @property
     def channel_input_dirs(self):  # type: () -> dict
         """A dict[str, str] containing the data channels and the directories where the training
         data was saved.
@@ -511,72 +633,10 @@ class Environment(collections.Mapping):
         """
         return self._channel_input_dirs
 
-    @property
-    def current_host(self):  # type: () -> str
-        """The name of the current container on the container network. For example, 'algo-1'.
-        Returns:
-            (str): current host.
-        """
-        return self._current_host
-
-    @property
-    def num_gpu(self):  # type: () -> int
-        """The number of gpus available in the current container.
-
-        Returns:
-            (int): number of gpus available in the current container.
-        """
-        return self._num_gpu
-
-    @property
-    def num_cpu(self):  # type: () -> int
-        """The number of cpus available in the current container.
-
-        Returns:
-            (int): number of cpus available in the current container.
-        """
-        return self._num_cpu
-
-    @property
-    def module_name(self):  # type: () -> str
-        """The name of the user provided module.
-
-        Returns:
-            (str): name of the user provided module
-        """
-        return self._module_name
-
-    @property
-    def module_dir(self):  # type: () -> str
-        """The full path location of the user provided module.
-
-        Returns:
-            (str): full path location of the user provided module.
-        """
-        return self._module_dir
-
-    @property
-    def enable_metrics(self):  # type: () -> bool
-        """Whether metrics should be executed in the environment or not.
-
-        Returns:
-            (bool): representing whether metrics should be execute or not.
-        """
-        return self._enable_metrics
-
-    @property
-    def log_level(self):  # type: () -> int
-        """Environment logging level.
-
-        Returns:
-            (int): environment logging level.
-        """
-        return self._log_level
-
     @classmethod
     def create(cls, session=None):  # type: (boto3.Session) -> Environment
         """
-        Returns: an instance of `Environment`
+        Returns: an instance of `TrainingEnvironment`
         """
         session = session or boto3.Session()
 
@@ -609,24 +669,102 @@ class Environment(collections.Mapping):
                    hyperparameters=hyperparameters,
                    resource_config=resource_config,
                    input_data_config=read_input_data_config(),
-                   module_name=str(sagemaker_hyperparameters.get(PROGRAM_PARAM)),
+                   module_name=str(sagemaker_hyperparameters.get(USER_PROGRAM_PARAM)),
                    module_dir=str(sagemaker_hyperparameters.get(SUBMIT_DIR_PARAM)),
                    enable_metrics=sagemaker_hyperparameters.get(ENABLE_METRICS_PARAM, False),
                    log_level=sagemaker_hyperparameters.get(LOG_LEVEL_PARAM, logging.INFO)
                    )
 
-    @staticmethod
-    def _parse_module_name(program_param):
-        """Given a module name or a script name, Returns the module name.
 
-        This function is used for backwards compatibility.
+class ServingEnvironment(Environment):
+    """Provides access to aspects of the serving environment relevant to serving containers, including
+       system characteristics, environment variables and configuration settings.
 
-        Args:
-            program_param (str): Module or script name.
+       The environment is a read-only snapshot of the container environment. It does not contain any form of state.
+       It is a dictionary like object, allowing any builtin function that works with dictionary.
 
-        Returns:
-            (str): Module name
+       Example on how to print the state of the container:
+           >>> print(str(smc.environment.ServingEnvironment.create()))
+
+       Example on how a script can use training environment:
+           ```
+           >>>import sagemaker_containers as smc
+           >>>env = smc.environment.ServingEnvironment.create()
+
+    """
+    def __init__(self,
+                 use_nginx,  # type: bool
+                 model_server_timeout,  # type: int
+                 model_server_workers,  # type: int
+                 hosts,  # type: () -> list
+                 current_host,  # type: str
+                 num_gpu,  # type: int
+                 num_cpu,  # type: int
+                 module_name,  # type: str
+                 module_dir,  # type: str
+                 enable_metrics,  # type: bool
+                 log_level,  # type: int
+                 ):
         """
-        if program_param.endswith('.py'):
-            return program_param[:-3]
-        return program_param
+        Args:
+            use_nginx (bool): Whether to use nginx as a reverse proxy.
+
+            model_server_timeout (int): Timeout in seconds for the model server.
+
+            model_server_workers (int): Number of worker processes the model server will use.
+
+            hosts (list[str]): The list of names of all containers on the container network, sorted lexicographically.
+                    For example, `['algo-1', 'algo-2', 'algo-3']` for a three-node cluster.
+
+            current_host (str): The name of the current container on the container network. For example, 'algo-1'.
+
+            num_gpu (int): The number of gpus available in the current container.
+
+            num_cpu (int): The number of cpus available in the current container.:
+        """
+        super(ServingEnvironment, self).__init__(current_host, num_gpu, num_cpu, module_name,
+                                                 module_dir, enable_metrics, log_level)
+        self._use_nginx = use_nginx
+        self._model_server_timeout = model_server_timeout
+        self._model_server_workers = model_server_workers
+
+    @property
+    def use_nginx(self):  # type: () -> bool
+        """Returns:
+            (bool): whether to use nginx as a reverse proxy"""
+        return self._use_nginx
+
+    @property
+    def model_server_timeout(self):  # type: () -> int
+        """Returns:
+            (int): Timeout in seconds for the model server."""
+        return self._model_server_timeout
+
+    @property
+    def model_server_workers(self):  # type: () -> int
+        """Returns:
+            (int): Number of worker processes the model server will use"""
+        return self._model_server_workers
+
+    @classmethod
+    def create(cls, session=None):  # type: (boto3.Session) -> Environment
+        """
+        Returns: an instance of `TrainingEnvironment`
+        """
+        session = session or boto3.Session()
+
+        use_nginx = os.environ.get(USE_NGINX_ENV, 'true') == 'true'
+        model_server_timeout = int(os.environ.get(MODEL_SERVER_TIMEOUT_ENV, '60'))
+        model_server_workers = int(os.environ.get(MODEL_SERVER_WORKERS_ENV, cpu_count()))
+        hosts = None
+        current_host = os.environ.get(CURRENT_HOST_ENV)
+        module_name = os.environ.get(USER_PROGRAM_PARAM.upper(), None)
+        module_dir = os.environ.get(SUBMIT_DIR_PARAM.upper(), None)
+        enable_metrics = os.environ.get(ENABLE_METRICS_PARAM.upper(), 'false') == 'true'
+        log_level = os.environ.get(LOG_LEVEL_PARAM.upper(), '')
+
+        sagemaker_region = os.environ.get(REGION_PARAM_NAME.upper(), session.region_name)
+        os.environ[REGION_PARAM_NAME.upper()] = sagemaker_region
+
+        return cls(use_nginx, model_server_timeout, model_server_workers, hosts, current_host,
+                   gpu_count(), cpu_count(), module_name, module_dir, enable_metrics, log_level)
