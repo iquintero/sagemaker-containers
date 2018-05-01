@@ -13,3 +13,5 @@
 from __future__ import absolute_import
 
 from sagemaker_containers import collections, modules, environment  # noqa ignore=F401 imported but unused
+from sagemaker_containers.environment import Environment, ServingEnvironment, TrainingEnvironment  # noqa ignore=F401
+#  imported but unused
