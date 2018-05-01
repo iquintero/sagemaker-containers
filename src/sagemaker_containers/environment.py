@@ -13,6 +13,7 @@
 from __future__ import absolute_import
 
 import collections
+import distutils
 import json
 import logging
 import multiprocessing
@@ -251,7 +252,7 @@ class Environment(collections.Mapping):
         current_host = os.environ.get(CURRENT_HOST_ENV)
         module_name = os.environ.get(USER_PROGRAM_ENV, None)
         module_dir = os.environ.get(SUBMIT_DIR_ENV, None)
-        enable_metrics = os.environ.get(ENABLE_METRICS_ENV, 'false') == 'true'
+        enable_metrics = distutils.util.strtobool(os.environ.get(ENABLE_METRICS_ENV, 'false')) == 1
         log_level = os.environ.get(LOG_LEVEL_ENV, logging.INFO)
 
         sagemaker_region = os.environ.get(REGION_NAME_ENV, session.region_name)
@@ -653,7 +654,7 @@ class ServingEnvironment(Environment):
         """
         super(ServingEnvironment, self).__init__(session)
 
-        use_nginx = os.environ.get(USE_NGINX_ENV, 'true') == 'true'
+        use_nginx = distutils.util.strtobool(os.environ.get(USE_NGINX_ENV, 'true')) == 1
         model_server_timeout = int(os.environ.get(MODEL_SERVER_TIMEOUT_ENV, '60'))
         model_server_workers = int(os.environ.get(MODEL_SERVER_WORKERS_ENV, cpu_count()))
 
@@ -670,7 +671,8 @@ class ServingEnvironment(Environment):
     @property
     def model_server_timeout(self):  # type: () -> int
         """Returns:
-            (int): Timeout in seconds for the model server."""
+            (int): Timeout in seconds for the model server. This is passed over to gunicorn, from the docs:
+                Workers silent for more than this many seconds are killed and restarted. Our default value is 60."""
         return self._model_server_timeout
 
     @property
