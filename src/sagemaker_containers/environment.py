@@ -350,12 +350,12 @@ class TrainingEnvironment(Environment):
     It is a dictionary like object, allowing any builtin function that works with dictionary.
 
     Example on how to print the state of the container:
-        >>> print(str(smc.environment.TrainingEnvironment.create()))
+        >>> print(str(smc.environment.TrainingEnvironment()))
 
     Example on how a script can use training environment:
         ```
             >>>import sagemaker_containers as smc
-            >>>env = smc.environment.TrainingEnvironment.create()
+            >>>env = smc.environment.TrainingEnvironment()
 
             get the path of the channel 'training' from the inputdataconfig.json file
             >>>training_dir = env.channel_input_dirs['training']
@@ -469,7 +469,7 @@ class TrainingEnvironment(Environment):
         hyperparameters = read_hyperparameters()
         sagemaker_hyperparameters, hyperparameters = smc.collections.split_by_criteria(hyperparameters,
                                                                                        SAGEMAKER_HYPERPARAMETERS)
-        sagemaker_region = sagemaker_hyperparameters.get(REGION_NAME_ENV, session.region_name)
+        sagemaker_region = sagemaker_hyperparameters.get(REGION_NAME_PARAM, session.region_name)
         os.environ[JOB_NAME_ENV] = sagemaker_hyperparameters[JOB_NAME_PARAM]
         os.environ[CURRENT_HOST_ENV] = current_host
         os.environ[REGION_NAME_ENV] = sagemaker_region
@@ -633,12 +633,12 @@ class ServingEnvironment(Environment):
        It is a dictionary like object, allowing any builtin function that works with dictionary.
 
        Example on how to print the state of the container:
-           >>> print(str(smc.environment.ServingEnvironment.create()))
+           >>> print(str(smc.environment.ServingEnvironment()))
 
        Example on how a script can use training environment:
            ```
            >>>import sagemaker_containers as smc
-           >>>env = smc.environment.ServingEnvironment.create()
+           >>>env = smc.environment.ServingEnvironment()
 
 
         Attributes:
