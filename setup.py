@@ -15,6 +15,7 @@ setup(
 
     packages=find_packages(where='src', exclude=('test',)),
     package_dir={'': 'src'},
+    package_data={'sagemaker_containers': ['/etc/*']},
     py_modules=[os.path.splitext(os.path.basename(path))[0] for path in glob('src/*.py')],
     long_description=read('README.md'),
     author='Amazon Web Services',
