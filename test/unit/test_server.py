@@ -13,19 +13,16 @@
 from mock import call, patch, PropertyMock
 
 from sagemaker_containers.environment import ServingEnvironment
-from sagemaker_containers.server import start_server
+from sagemaker_containers.server import start
 
 
-@patch.object(ServingEnvironment, 'model_server_workers', new_callable=PropertyMock)
-@patch.object(ServingEnvironment, 'model_server_timeout', new_callable=PropertyMock)
-@patch.object(ServingEnvironment, 'use_nginx', new_callable=PropertyMock)
+@patch.object(ServingEnvironment, 'model_server_workers', PropertyMock(return_value=2))
+@patch.object(ServingEnvironment, 'model_server_timeout', PropertyMock(return_value=100))
+@patch.object(ServingEnvironment, 'use_nginx', PropertyMock(return_value=False))
 @patch('sagemaker_containers.environment.gpu_count', lambda: 0)
 @patch('sys.exit', lambda x: 0)
 @patch('subprocess.Popen')
-def test_start_no_nginx(popen, use_nginx, model_server_timeout, model_server_workers):
-    use_nginx.return_value = False
-    model_server_workers.return_value = 2
-    model_server_timeout.return_value = 100
+def test_start_no_nginx(popen):
     calls = [call(
                  ['gunicorn',
                   '--timeout', '100',
@@ -33,23 +30,20 @@ def test_start_no_nginx(popen, use_nginx, model_server_timeout, model_server_wor
                   '-b', '0.0.0.0:8080',
                   '--worker-connections', '2000',
                   '-w', '2',
-                  '--log-level', 'debug',
+                  '--log-level', 'info',
                   'my_module'])]
 
-    start_server('my_module')
+    start('my_module')
     popen.assert_has_calls(calls)
 
 
-@patch.object(ServingEnvironment, 'model_server_workers', new_callable=PropertyMock)
-@patch.object(ServingEnvironment, 'model_server_timeout', new_callable=PropertyMock)
-@patch.object(ServingEnvironment, 'use_nginx', new_callable=PropertyMock)
+@patch.object(ServingEnvironment, 'model_server_workers', PropertyMock(return_value=2))
+@patch.object(ServingEnvironment, 'model_server_timeout', PropertyMock(return_value=100))
+@patch.object(ServingEnvironment, 'use_nginx', PropertyMock(return_value=True))
 @patch('sagemaker_containers.environment.gpu_count', lambda: 0)
 @patch('sys.exit', lambda x: 0)
 @patch('subprocess.Popen')
-def test_start_with_nginx(popen, use_nginx, model_server_timeout, model_server_workers):
-    model_server_workers.return_value = 2
-    model_server_timeout.return_value = 100
-    use_nginx.return_value = True
+def test_start_with_nginx(popen):
     calls = [
         call(['nginx', '-c', '/tmp/nginx.conf']),
         call(['gunicorn',
@@ -58,8 +52,8 @@ def test_start_with_nginx(popen, use_nginx, model_server_timeout, model_server_w
               '-b', 'unix:/tmp/gunicorn.sock',
               '--worker-connections', '2000',
               '-w', '2',
-              '--log-level', 'debug',
+              '--log-level', 'info',
               'my_module'])
     ]
-    start_server('my_module')
+    start('my_module')
     popen.assert_has_calls(calls)

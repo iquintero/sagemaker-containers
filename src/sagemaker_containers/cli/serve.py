@@ -10,12 +10,12 @@
 # distributed on an 'AS IS' BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-import sagemaker_containers
+import sagemaker_containers as smc
 
 
 def main():
-    env = sagemaker_containers.environment.ServingEnvironment()
-    sagemaker_containers.server.start_server(env.flask_app)
+    env = smc.environment.ServingEnvironment()
+    smc.server.start(env.framework_module)
 
 
 if __name__ == "__main__":

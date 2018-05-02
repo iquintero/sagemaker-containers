@@ -16,9 +16,10 @@ import signal
 import subprocess
 import sys
 
-import sagemaker_containers
+import sagemaker_containers as smc
 
-NGINX_PID = 0
+UNIX_SOCKET_BIND = 'unix:/tmp/gunicorn.sock'
+HTTP_BIND = '0.0.0.0:8080'
 
 
 def add_terminate_signal(process):
@@ -28,15 +29,15 @@ def add_terminate_signal(process):
     signal.signal(signal.SIGTERM, terminate)
 
 
-def start_server(module_app):
+def start(module_app):
 
-    env = sagemaker_containers.environment.ServingEnvironment()
-    gunicorn_bind_address = '0.0.0.0:8080'
+    env = smc.environment.ServingEnvironment()
+    gunicorn_bind_address = HTTP_BIND
 
     nginx = None
 
     if env.use_nginx:
-        gunicorn_bind_address = 'unix:/tmp/gunicorn.sock'
+        gunicorn_bind_address = UNIX_SOCKET_BIND
         nginx = subprocess.Popen(['nginx', '-c', '/tmp/nginx.conf'])
 
         add_terminate_signal(nginx)
@@ -47,7 +48,7 @@ def start_server(module_app):
                                  '-b', gunicorn_bind_address,
                                  '--worker-connections', str(1000 * env.model_server_workers),
                                  '-w', str(env.model_server_workers),
-                                 '--log-level', 'debug',
+                                 '--log-level', 'info',
                                  module_app])
 
     add_terminate_signal(gunicorn)

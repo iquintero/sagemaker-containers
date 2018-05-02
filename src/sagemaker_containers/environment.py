@@ -73,7 +73,7 @@ REGION_NAME_ENV = REGION_NAME_PARAM.upper()  # type: str
 MODEL_SERVER_WORKERS_ENV = 'SAGEMAKER_MODEL_SERVER_WORKERS'  # type: str
 MODEL_SERVER_TIMEOUT_ENV = 'SAGEMAKER_MODEL_SERVER_TIMEOUT'  # type: str
 USE_NGINX_ENV = 'SAGEMAKER_USE_NGINX'  # type: str
-FLASK_APP_ENV = 'SAGEMAKER_FLASK_APP'  # type: str
+FRAMEWORK_MODULE_ENV = 'SAGEMAKER_FRAMEWORK_MODULE'  # type: str
 
 SAGEMAKER_HYPERPARAMETERS = (USER_PROGRAM_PARAM, SUBMIT_DIR_PARAM, ENABLE_METRICS_PARAM, REGION_NAME_PARAM,
                              LOG_LEVEL_PARAM, JOB_NAME_PARAM, DEFAULT_MODULE_NAME_PARAM)  # type: set
@@ -658,12 +658,12 @@ class ServingEnvironment(Environment):
         use_nginx = util.strtobool(os.environ.get(USE_NGINX_ENV, 'true')) == 1
         model_server_timeout = int(os.environ.get(MODEL_SERVER_TIMEOUT_ENV, '60'))
         model_server_workers = int(os.environ.get(MODEL_SERVER_WORKERS_ENV, cpu_count()))
-        flask_app = os.environ.get(FLASK_APP_ENV, 'server:app')
+        framework_module = os.environ.get(FRAMEWORK_MODULE_ENV, 'server:app')
 
         self._use_nginx = use_nginx
         self._model_server_timeout = model_server_timeout
         self._model_server_workers = model_server_workers
-        self._flask_app = flask_app
+        self._framework_module = framework_module
 
     @property
     def use_nginx(self):  # type: () -> bool
@@ -685,7 +685,7 @@ class ServingEnvironment(Environment):
         return self._model_server_workers
 
     @property
-    def flask_app(self):  # type: () -> str
+    def framework_module(self):  # type: () -> str
         """Returns:
-            (str): Name of the flask app to use for serving."""
-        return self._flask_app
+            (str): Name of the framework module to be used for serving."""
+        return self._framework_module

@@ -16,9 +16,8 @@ from sagemaker_containers.cli import serve
 from sagemaker_containers.environment import ServingEnvironment
 
 
-@patch.object(ServingEnvironment, 'flask_app', new_callable=PropertyMock)
-@patch('sagemaker_containers.server.start_server')
-def test_entry_point(start_server, flask_app):
-    flask_app.return_value = 'my_flask_app'
+@patch.object(ServingEnvironment, 'framework_module', PropertyMock(return_value='my_flask_app'))
+@patch('sagemaker_containers.server.start')
+def test_entry_point(start):
     serve.main()
-    start_server.assert_called_with('my_flask_app')
+    start.assert_called_with('my_flask_app')
