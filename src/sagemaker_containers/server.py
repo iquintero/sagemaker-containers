@@ -16,6 +16,8 @@ import signal
 import subprocess
 import sys
 
+import pkg_resources
+
 import sagemaker_containers as smc
 
 UNIX_SOCKET_BIND = 'unix:/tmp/gunicorn.sock'
@@ -38,7 +40,8 @@ def start(module_app):
 
     if env.use_nginx:
         gunicorn_bind_address = UNIX_SOCKET_BIND
-        nginx = subprocess.Popen(['nginx', '-c', '/tmp/nginx.conf'])
+        nginx_config_file = pkg_resources.resource_filename(smc.__name__, '/etc/nginx.conf')
+        nginx = subprocess.Popen(['nginx', '-c', nginx_config_file])
 
         add_terminate_signal(nginx)
 

@@ -40,6 +40,7 @@ def test_start_no_nginx(popen):
 @patch.object(ServingEnvironment, 'model_server_workers', PropertyMock(return_value=2))
 @patch.object(ServingEnvironment, 'model_server_timeout', PropertyMock(return_value=100))
 @patch.object(ServingEnvironment, 'use_nginx', PropertyMock(return_value=True))
+@patch('pkg_resources.resource_filename', lambda x, y: '/tmp/nginx.conf')
 @patch('sagemaker_containers.environment.gpu_count', lambda: 0)
 @patch('sys.exit', lambda x: 0)
 @patch('subprocess.Popen')
