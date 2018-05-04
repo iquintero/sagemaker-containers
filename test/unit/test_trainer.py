@@ -15,25 +15,14 @@ from mock import Mock, patch, PropertyMock
 from sagemaker_containers import env, trainer
 
 
-HYPERPARAMS = {
-    'x': 1,
-    'sagemaker_region': 'us-west-2',
-    'sagemaker_job_name': 'sagemaker-training-job',
-    'sagemaker_program': 'main.py',
-    'sagemaker_submit_directory': 'imagenet',
-    'sagemaker_enable_cloudwatch_metrics': True
-}
+class TrainingEnv(Mock):
+    framework_module = 'my_framework:train'
 
 
 @patch('importlib.import_module')
-@patch('sagemaker_containers.env.read_hyperparameters', lambda: HYPERPARAMS)
-@patch('sagemaker_containers.env.read_input_data_config', lambda: {'input': 'yes'})
-@patch('sagemaker_containers.env.read_resource_config', lambda: {'current_host': '1', 'hosts': ['1']})
-@patch.object(env.TrainingEnv, 'model_dir', PropertyMock(return_value='model_dir'))
-@patch.object(env.TrainingEnv, 'framework_module', PropertyMock(return_value='my_framework:train'))
-def test_train(import_module):
+@patch('sagemaker_containers.env.TrainingEnv', new_callable=TrainingEnv)
+def test_train(training_env, import_module):
     framework = Mock()
-
     import_module.return_value = framework
     trainer.train()
 
