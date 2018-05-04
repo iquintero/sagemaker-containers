@@ -220,6 +220,8 @@ class Env(mapping.MappingMixin):
             num_cpu (int): The number of cpus available in the current container.
             module_name (str): The name of the user provided module.
             module_dir (str): The full path location of the user provided module.
+            framework_module (str):  Name of the framework module and entry point. For example:
+                my_module:main
     """
 
     def __init__(self):
@@ -304,7 +306,8 @@ class Env(mapping.MappingMixin):
     @property
     def framework_module(self):  # type: () -> str
         """Returns:
-            (str): Name of the framework module to be used for serving."""
+            (str): Name of the framework module and entry point. For example:
+                my_module:main"""
         return self._framework_module
 
     @staticmethod
@@ -630,7 +633,6 @@ class ServingEnv(Env):
             use_nginx (bool): Whether to use nginx as a reverse proxy.
             model_server_timeout (int): Timeout in seconds for the model server.
             model_server_workers (int): Number of worker processes the model server will use.
-            flask_app (str): Name of the flask app to use. Default: server:app
     """
 
     def __init__(self):
