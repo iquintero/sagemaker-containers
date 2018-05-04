@@ -228,6 +228,7 @@ class Env(mapping.MappingMixin):
         module_dir = os.environ.get(SUBMIT_DIR_ENV, None)
         enable_metrics = util.strtobool(os.environ.get(ENABLE_METRICS_ENV, 'false')) == 1
         log_level = os.environ.get(LOG_LEVEL_ENV, logging.INFO)
+        framework_module = os.environ.get(FRAMEWORK_MODULE_ENV, ' ')
 
         self._current_host = current_host
         self._num_gpu = gpu_count()
@@ -236,6 +237,7 @@ class Env(mapping.MappingMixin):
         self._module_dir = module_dir
         self._enable_metrics = enable_metrics
         self._log_level = log_level
+        self._framework_module = framework_module
 
     @property
     def current_host(self):  # type: () -> str
@@ -298,6 +300,12 @@ class Env(mapping.MappingMixin):
             (int): environment logging level.
         """
         return self._log_level
+
+    @property
+    def framework_module(self):  # type: () -> str
+        """Returns:
+            (str): Name of the framework module to be used for serving."""
+        return self._framework_module
 
     @staticmethod
     def _parse_module_name(program_param):
@@ -631,12 +639,10 @@ class ServingEnv(Env):
         use_nginx = util.strtobool(os.environ.get(USE_NGINX_ENV, 'true')) == 1
         model_server_timeout = int(os.environ.get(MODEL_SERVER_TIMEOUT_ENV, '60'))
         model_server_workers = int(os.environ.get(MODEL_SERVER_WORKERS_ENV, cpu_count()))
-        framework_module = os.environ.get(FRAMEWORK_MODULE_ENV, 'server:app')
 
         self._use_nginx = use_nginx
         self._model_server_timeout = model_server_timeout
         self._model_server_workers = model_server_workers
-        self._framework_module = framework_module
 
     @property
     def use_nginx(self):  # type: () -> bool
@@ -656,12 +662,6 @@ class ServingEnv(Env):
         """Returns:
             (int): Number of worker processes the model server will use"""
         return self._model_server_workers
-
-    @property
-    def framework_module(self):  # type: () -> str
-        """Returns:
-            (str): Name of the framework module to be used for serving."""
-        return self._framework_module
 
 
 @contextlib.contextmanager
