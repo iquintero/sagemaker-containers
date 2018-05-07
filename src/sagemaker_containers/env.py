@@ -471,7 +471,7 @@ class TrainingEnv(Env):
         self._module_dir = str(sagemaker_hyperparameters[SUBMIT_DIR_PARAM])
         self._enable_metrics = sagemaker_hyperparameters.get(ENABLE_METRICS_PARAM, False)
         self._log_level = sagemaker_hyperparameters.get(LOG_LEVEL_PARAM, logging.INFO)
-        self._framework_module = os.environ.get(FRAMEWORK_TRAINING_MODULE_ENV, ' ')
+        self._framework_module = os.environ.get(FRAMEWORK_TRAINING_MODULE_ENV, None)
 
     @property
     def hosts(self):  # type: () -> list
@@ -643,7 +643,7 @@ class ServingEnv(Env):
         use_nginx = util.strtobool(os.environ.get(USE_NGINX_ENV, 'true')) == 1
         model_server_timeout = int(os.environ.get(MODEL_SERVER_TIMEOUT_ENV, '60'))
         model_server_workers = int(os.environ.get(MODEL_SERVER_WORKERS_ENV, cpu_count()))
-        framework_module = os.environ.get(FRAMEWORK_SERVING_MODULE_ENV, ' ')
+        framework_module = os.environ.get(FRAMEWORK_SERVING_MODULE_ENV, None)
 
         self._use_nginx = use_nginx
         self._model_server_timeout = model_server_timeout
