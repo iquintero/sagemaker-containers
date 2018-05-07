@@ -77,7 +77,8 @@ REGION_NAME_ENV = REGION_NAME_PARAM.upper()  # type: str
 MODEL_SERVER_WORKERS_ENV = 'SAGEMAKER_MODEL_SERVER_WORKERS'  # type: str
 MODEL_SERVER_TIMEOUT_ENV = 'SAGEMAKER_MODEL_SERVER_TIMEOUT'  # type: str
 USE_NGINX_ENV = 'SAGEMAKER_USE_NGINX'  # type: str
-FRAMEWORK_MODULE_ENV = 'SAGEMAKER_FRAMEWORK_MODULE'  # type: str
+FRAMEWORK_SERVING_MODULE_ENV = 'SAGEMAKER_SERVING_MODULE'  # type: str
+FRAMEWORK_TRAINING_MODULE_ENV = 'SAGEMAKER_TRAINING_MODULE'  # type: str
 
 SAGEMAKER_HYPERPARAMETERS = (USER_PROGRAM_PARAM, SUBMIT_DIR_PARAM, ENABLE_METRICS_PARAM, REGION_NAME_PARAM,
                              LOG_LEVEL_PARAM, JOB_NAME_PARAM, DEFAULT_MODULE_NAME_PARAM)  # type: set
@@ -220,8 +221,6 @@ class Env(mapping.MappingMixin):
             num_cpu (int): The number of cpus available in the current container.
             module_name (str): The name of the user provided module.
             module_dir (str): The full path location of the user provided module.
-            framework_module (str):  Name of the framework module and entry point. For example:
-                my_module:main
     """
 
     def __init__(self):
@@ -230,7 +229,6 @@ class Env(mapping.MappingMixin):
         module_dir = os.environ.get(SUBMIT_DIR_ENV, None)
         enable_metrics = util.strtobool(os.environ.get(ENABLE_METRICS_ENV, 'false')) == 1
         log_level = os.environ.get(LOG_LEVEL_ENV, logging.INFO)
-        framework_module = os.environ.get(FRAMEWORK_MODULE_ENV, ' ')
 
         self._current_host = current_host
         self._num_gpu = gpu_count()
@@ -239,7 +237,6 @@ class Env(mapping.MappingMixin):
         self._module_dir = module_dir
         self._enable_metrics = enable_metrics
         self._log_level = log_level
-        self._framework_module = framework_module
 
     @property
     def current_host(self):  # type: () -> str
@@ -302,13 +299,6 @@ class Env(mapping.MappingMixin):
             (int): environment logging level.
         """
         return self._log_level
-
-    @property
-    def framework_module(self):  # type: () -> str
-        """Returns:
-            (str): Name of the framework module and entry point. For example:
-                my_module:main"""
-        return self._framework_module
 
     @staticmethod
     def _parse_module_name(program_param):
@@ -443,6 +433,8 @@ class TrainingEnv(Env):
                 - `channel`(str) - the name of the channel defined in the input_data_config.
                 - `training data path`(str) - the path to the directory where the training data is
                 saved.
+        framework_module (str):  Name of the framework module and entry point. For example:
+            my_module:main
     """
 
     def __init__(self):
@@ -479,6 +471,7 @@ class TrainingEnv(Env):
         self._module_dir = str(sagemaker_hyperparameters[SUBMIT_DIR_PARAM])
         self._enable_metrics = sagemaker_hyperparameters.get(ENABLE_METRICS_PARAM, False)
         self._log_level = sagemaker_hyperparameters.get(LOG_LEVEL_PARAM, logging.INFO)
+        self._framework_module = os.environ.get(FRAMEWORK_TRAINING_MODULE_ENV, ' ')
 
     @property
     def hosts(self):  # type: () -> list
@@ -612,6 +605,13 @@ class TrainingEnv(Env):
         """
         return self._channel_input_dirs
 
+    @property
+    def framework_module(self):  # type: () -> str
+        """Returns:
+            (str): Name of the framework module and entry point. For example:
+                my_module:main"""
+        return self._framework_module
+
 
 class ServingEnv(Env):
     """Provides access to aspects of the serving environment relevant to serving containers, including
@@ -633,6 +633,8 @@ class ServingEnv(Env):
             use_nginx (bool): Whether to use nginx as a reverse proxy.
             model_server_timeout (int): Timeout in seconds for the model server.
             model_server_workers (int): Number of worker processes the model server will use.
+            framework_module (str):  Name of the framework module and entry point. For example:
+                my_module:main
     """
 
     def __init__(self):
@@ -641,10 +643,12 @@ class ServingEnv(Env):
         use_nginx = util.strtobool(os.environ.get(USE_NGINX_ENV, 'true')) == 1
         model_server_timeout = int(os.environ.get(MODEL_SERVER_TIMEOUT_ENV, '60'))
         model_server_workers = int(os.environ.get(MODEL_SERVER_WORKERS_ENV, cpu_count()))
+        framework_module = os.environ.get(FRAMEWORK_SERVING_MODULE_ENV, ' ')
 
         self._use_nginx = use_nginx
         self._model_server_timeout = model_server_timeout
         self._model_server_workers = model_server_workers
+        self._framework_module = framework_module
 
     @property
     def use_nginx(self):  # type: () -> bool
@@ -664,6 +668,13 @@ class ServingEnv(Env):
         """Returns:
             (int): Number of worker processes the model server will use"""
         return self._model_server_workers
+
+    @property
+    def framework_module(self):  # type: () -> str
+        """Returns:
+            (str): Name of the framework module and entry point. For example:
+                my_module:main"""
+        return self._framework_module
 
 
 @contextlib.contextmanager
