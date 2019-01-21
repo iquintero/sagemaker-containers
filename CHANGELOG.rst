@@ -2,6 +2,11 @@
 CHANGELOG
 =========
 
+2.4.3
+=====
+
+* bug-fix: correctly set NGINX_PROXY_READ_TIMEOUT to match model_sever_timeout.
+
 2.4.2
 =====
 
